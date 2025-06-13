@@ -18,7 +18,7 @@ runs:
     - name: Install project dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install requirements.txt
+        pip install -r requirements.txt
 
     - name: Build project
       run: |
