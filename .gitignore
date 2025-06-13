@@ -1,1 +1,2 @@
-build/
+# Makefile (build) artifacts.
+/build
