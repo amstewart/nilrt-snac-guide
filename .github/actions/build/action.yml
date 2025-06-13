@@ -18,7 +18,8 @@ runs:
     - name: Install project host dependencies
       shell: bash
       run: |
-        sudo apt-get update && apt-get install -y \
+        sudo apt-get update
+        sudo apt-get install -y \
           latexmk \
           texlive \
           texlive-fonts-extra \
