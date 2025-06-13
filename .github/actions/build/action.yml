@@ -29,5 +29,11 @@ runs:
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
       with:
+        name: build
+        path: build/
+
+    - name: Upload SNAC PDF artifacts
+      uses: actions/upload-artifact@v4
+      with:
         name: SNAC-PDF
         path: build/latex/SNAC.pdf
