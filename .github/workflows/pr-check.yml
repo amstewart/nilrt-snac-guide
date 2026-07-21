@@ -2,6 +2,10 @@ name: PR Checks
 
 on: [pull_request]
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   Build:
     runs-on: ubuntu-latest
@@ -12,3 +16,81 @@ jobs:
 
     - name: Build project
       uses: ./.github/actions/build
+
+    - name: Upload SNAC PDF artifact
+      id: upload_snac_pdf
+      uses: actions/upload-artifact@v7
+      with:
+        name: snac-pdf
+        path: build/latex/SNAC.pdf
+        archive: false
+        if-no-files-found: error
+
+    - name: Comment SNAC PDF link on PR
+      if: github.event_name == 'pull_request'
+      continue-on-error: true
+      uses: actions/github-script@v7
+      env:
+        SNAC_PDF_ARTIFACT_URL: ${{ steps.upload_snac_pdf.outputs.artifact-url }}
+      with:
+        script: |
+          const marker = '<!-- snac-pdf-artifact-link -->';
+          const issue_number = context.payload.pull_request?.number;
+
+          if (!issue_number) {
+            core.info('No PR context found; skipping comment.');
+            return;
+          }
+
+          const pdfLink = process.env.SNAC_PDF_ARTIFACT_URL;
+          if (!pdfLink) {
+            core.warning('No artifact URL found for SNAC.pdf; skipping comment update.');
+            return;
+          }
+
+          const prHeadSha = context.payload.pull_request?.head?.sha || context.sha;
+          const shortSha = prHeadSha.slice(0, 12);
+          const commitUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/commit/${prHeadSha}`;
+          const updatedAtUtc = new Date().toISOString();
+
+          const body = [
+            marker,
+            '### Built SNAC PDF',
+            '',
+            `- [Download latex/SNAC.pdf](${pdfLink})`,
+            `- Commit: [${shortSha}](${commitUrl})`,
+            `- Last updated (UTC): ${updatedAtUtc}`,
+            '- Link is available while workflow artifacts are retained.',
+            '',
+            `Workflow run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+          ].join('\n');
+
+          const comments = await github.paginate(github.rest.issues.listComments, {
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number,
+            per_page: 100,
+          });
+
+          const existing = comments.find((comment) => {
+            return comment.user?.type === 'Bot' && comment.body?.includes(marker);
+          });
+
+          if (existing) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: existing.id,
+              body,
+            });
+            core.info(`Updated existing SNAC PDF comment: ${existing.id}`);
+            return;
+          }
+
+          const created = await github.rest.issues.createComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number,
+            body,
+          });
+          core.info(`Created SNAC PDF comment: ${created.data.id}`);
